@@ -4,8 +4,8 @@
 # various specializations for LSST (during DC2)
 #
 import sys, os, os.path, re, atexit, shutil
-import eupsServer
-import eupsDistrib
+import eups.distrib.server as eupsServer
+import eups.distrib.Distrib as eupsDistrib
 
 defaultPackageBase = "http://dev.lsstcorp.org/pkgs"
 
@@ -246,9 +246,9 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
         if not self.noeups:
             try :
-                pinfo = self.Eups.listProducts(product, version)[0]
-                path = pinfo[3]
-                db = pinfo[2]
+                pinfo = self.Eups.findProduct(product, version)
+                path = pinfo.dir
+                db = pinfo.stackRoot()
 
                 if path.startswith(db) and db != path:
                     installdir = path[len(db)+1:]
@@ -262,7 +262,7 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                         installdir = path[p:]
 
                 buildfile = product+".bld"
-                if not os.path.exists(os.path.join(pinfo[3], "ups", buildfile)):
+                if not os.path.exists(os.path.join(pinfo.dir,"ups",buildfile)):
                     buildfile = tarfile
 
                 return os.path.join(installdir, buildfile)
