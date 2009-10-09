@@ -5,7 +5,7 @@
 #
 import sys, os, os.path, re, atexit, shutil
 import eups.distrib.server as eupsServer
-import eups.distrib.Distrib as eupsDistrib
+import eups.distrib        as eupsDistrib
 
 defaultPackageBase = "http://dev.lsstcorp.org/pkgs"
 
