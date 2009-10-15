@@ -246,7 +246,7 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
         if not self.noeups:
             try :
-                pinfo = self.Eups.findProduct(product, version)
+                pinfo = self.Eups.getProduct(product, version)
                 path = pinfo.dir
                 db = pinfo.stackRoot()
 
@@ -267,7 +267,7 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
                 return os.path.join(installdir, buildfile)
 
-            except IndexError:
+            except eups.ProductNotFound:
                 pass
 
         return os.path.join(product, version, tarfile)
