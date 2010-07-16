@@ -130,11 +130,11 @@ if __name__ == "__main__":
     
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-import eupsServer
+import eups.distrib.server
 
-class ExtendibleConfigurableDistribServer(eupsServer.ConfigurableDistribServer):
+class ExtendibleConfigurableDistribServer(eups.distrib.server.ConfigurableDistribServer):
     """A version of ConfigurableDistribServer that we could augment
     """
 
     def __init__(self, *args):
-        super(eupsServer.ConfigurableDistribServer, self).__init__(*args)
+        super(eups.distrib.server.ConfigurableDistribServer, self).__init__(*args)
