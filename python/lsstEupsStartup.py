@@ -3,7 +3,7 @@
 import os, re, sys
 import pdb
 import eups
-import eupsDistribBuilder
+import eups.distrib.builder
 try:
     import lsst.svn
     noLsstSvn = 0
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     #
     # Rewrite ticket names into proper svn urls
     #
-    eupsDistribBuilder.buildfilePatchCallbacks.add(rewriteTicketVersion)
+    eups.distrib.builder.buildfilePatchCallbacks.add(rewriteTicketVersion)
 
     try:
         eups.commandCallbacks.add(cmdHook)
