@@ -1,6 +1,6 @@
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
-envSet(SVNROOT, svn+ssh://svn.lsstcorp.org)
+envSet(SVNROOT, svn+ssh://svn.lsstcorp.org)	# shouldn't this come from "setupRequired(lsst)"?
 
 if (type == "build") {
    setupRequired(scons)
