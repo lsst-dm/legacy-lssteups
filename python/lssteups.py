@@ -272,7 +272,8 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
         return os.path.join(product, version, tarfile)
         
-    def createPackage(self, serverDir, product, version, flavor=None):
+    def createPackage(self, serverDir, product, version, flavor=None, 
+                      overwrite=False, letterVersion=None):
         """Write a package distribution into server directory tree and 
         return the distribution ID.  If a package is made up of several files,
         all of them (except for the manifest) should be deployed by this 
@@ -287,11 +288,18 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                                 be ignored by the implentation.  None means
                                 that a non-flavor-specific package is preferred, 
                                 if supported.
+        @param overwrite      if True, this package will overwrite any 
+                                previously existing distribution files even if Eups.force is false
+        @param letterVersion The name for the desired "letter version"; a rebuild
+                                 with following an ABI change in a dependency
         """
         distId = self._getDistLocation(product, version)
         installdir = os.path.dirname(distId)
         distIdFile = os.path.join(serverDir, distId)
         distDir = os.path.dirname(distIdFile)
+
+        if letterVersion:
+            raise RuntimeError("Letter versions are not supported: %s" % letterVersion)
 
         # make the product directory
         if not os.path.exists(distDir):
