@@ -68,12 +68,13 @@ def rewriteTicketVersion(line):
    means revision 6021 on ticket 374"""
 
     global noLsstSvn
-    import sys
     if noLsstSvn:
         if noLsstSvn > 0:
             print >> sys.stderr, "Unable to import lsst.svn --- maybe scons isn't setup?"
             noLsstSvn = -1
         return line
+
+    import lsst, re, sys                # need to import here as definition is used as a callback
     #
     # Look for a tagname that we recognise as having special significance
     #
