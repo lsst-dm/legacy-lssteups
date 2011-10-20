@@ -97,6 +97,17 @@ function fetch  {
 }
 
 #@
+#  fetch and install the .cfg file for the package in the
+#  ups directory.  This assumes a .cfg files with the same
+#  name as the package is available on the distribution
+#  server.
+#
+function fetch_cfg {
+    mkdir -p $installdir/ups
+    (cd $installdir/ups && fetch external/$product/$release/$product.cfg)
+}
+
+#@
 #  fetch the table file for the product being built.  This assumes
 #  the product is an LSST one, not external.
 #
@@ -342,6 +353,10 @@ function unpack_tar_and_build {
         simplepysetup || { unpacking_and_building= ; return 1; }
     else
         echo "Warning: nothing found to build in tar file: $file"
+    fi
+    if [ ! -f "$installdir/ups/$product.cfg" ]; then
+	echo "Fetching $product.cfg into $installdir/ups."
+	fetch_cfg
     fi
     unpacking_and_building=
 
