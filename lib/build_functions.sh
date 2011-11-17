@@ -97,6 +97,17 @@ function fetch  {
 }
 
 #@
+#  fetch and install the .cfg file for the package in the
+#  ups directory.  This assumes a .cfg files with the same
+#  name as the package is available on the distribution
+#  server.
+#
+function fetch_cfg {
+    mkdir -p $installdir/ups
+    (cd $installdir/ups && fetch external/$product/$release/$product.cfg)
+}
+
+#@
 #  fetch the table file for the product being built.  This assumes
 #  the product is an LSST one, not external.
 #
@@ -199,7 +210,7 @@ function simplemake {
 }
 
 #@
-#  run "scons install declare".  The $sconsopt variable, set to "opt=3" by 
+#  run "scons install".  The $sconsopt variable, set to "opt=3" by 
 #  default, will be included in the scons command line.
 #
 function simplescons {
@@ -213,9 +224,9 @@ function simplescons {
     ver=
     [ -n "$version" ] && ver="version=$version"
 
-    echo scons $sconsopt $idir $ver install declare $*
-    echo scons $sconsopt $idir $ver install declare $* >> $buildlog 
-    scons $sconsopt $idir $ver install declare $* >> $buildlog 2>&1 || {
+    echo scons $sconsopt $idir $ver install $*
+    echo scons $sconsopt $idir $ver install $* >> $buildlog 
+    scons $sconsopt $idir $ver install $* >> $buildlog 2>&1 || {
         echo "scons ..."
         tail -20 $buildlog
         echo "$prog: scons install failed; see $PWD/$buildlog for details"
@@ -343,13 +354,11 @@ function unpack_tar_and_build {
     else
         echo "Warning: nothing found to build in tar file: $file"
     fi
+    if [ ! -f "$installdir/ups/$product.cfg" ]; then
+	echo "Fetching $product.cfg into $installdir/ups."
+	fetch_cfg
+    fi
     unpacking_and_building=
-
-    # the specific build operation above may have declared the product to
-    # EUPS; however, if it has not, we would rather have the eups distrib 
-    # wrapper handle this
-    #
-    # ensure_declare
 
     return 0
 }
@@ -404,42 +413,3 @@ function selfsetup {
         fi
     fi
 }
-
-#@
-#  ensure that the product is declared to EUPS.  
-#  
-function ensure_declare {
-
-    if [ ! -d "$installdir" ]; then
-        echo $prog: $product $version does not appear to be installed, yet
-        return 1
-    fi
-
-    mkdir -p "$installdir/ups"
-    if [ ! -e "$installdir/ups/$product.table" ]; then
-
-        # find a table file to install
-        local tfile="ups/$product.table"
-        [ -f "$tfile" ] || tfile="$builddir/$product.table"
-
-        if [ ! -f "$tfile" ]; then
-            # try to get one from the server
-            local path=$serverpath
-            [ -n "$path" ] || path=$product/$version
-            tfile=`fetch $path/$product.table` || return 1
-        fi
-
-        # install it
-        cp $tfile "$installdir/ups"
-    fi
-    
-    if [ ! -f "$installdir/ups/$product.table" ]; then 
-        echo $prog: Failed to install table file into "$installdir/ups"
-        return 1
-    fi
-
-    eups expandtable -i "$installdir/ups/$product.table" && \
-        eups declare -r "$installdir" 
-    return $?
-}
-

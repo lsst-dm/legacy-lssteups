@@ -5,7 +5,7 @@ import pdb
 import eups
 import eups.distrib.builder
 try:
-    import lsst.svn
+    import lsst.sconsUtils.vcs.svn
     noLsstSvn = 0
 except ImportError:
     noLsstSvn = 1
@@ -70,7 +70,7 @@ def rewriteTicketVersion(line):
     global noLsstSvn
     if noLsstSvn:
         if noLsstSvn > 0:
-            print >> sys.stderr, "Unable to import lsst.svn --- maybe scons isn't setup?"
+            print >> sys.stderr, "Unable to import lsst.sconsUtils.vcs.svn --- maybe scons isn't setup?"
             noLsstSvn = -1
         return line
 
@@ -88,9 +88,9 @@ def rewriteTicketVersion(line):
 
             try:
                 try:
-                    type, which, revision = lsst.svn.parseVersionName(URL)
+                    type, which, revision = lsst.sconsUtils.vcs.svn.parseVersionName(URL)
                 except ValueError:      # old version doesn't return pm
-                    type, which, revision, pm = lsst.svn.parseVersionName(URL)
+                    type, which, revision, pm = lsst.sconsUtils.vcs.svn.parseVersionName(URL)
 
                 rewrite = None
                 if type == "branch":
