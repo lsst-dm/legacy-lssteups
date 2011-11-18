@@ -313,8 +313,8 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
     def _getDistLocation(self, product, version,
                          flavor='generic', prodinfo=None):
-        tarfile = "%s-%s.tar.gz" % (product, version)
         verdir = self._buildExtRe.sub('', version)
+        tarfile = "%s-%s.tar.gz" % (product, verdir)
         distdir = os.path.join(product, verdir)
 
         if not prodinfo and not self.noeups:
@@ -470,13 +470,15 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                                                               product, version,
                                                               flavor)
 
+        manpre = self.options.get("manifestPrefix", "b");
+
         buildExt = self._getBuildExt(version)
         if not buildExt:
             # has no trailing "+N"
-            mfile = "b0.manifest"
+            mfile = "%s0.manifest" % manpre
         elif buildExt[0] == '+':
             # has trailing "+N"
-            mfile = "b%s.manifest" % buildExt[1:]
+            mfile = "%s%s.manifest" % (manpre, buildExt[1:])
         else:
             # has trailing "-.*"; treat it as a pre-release
             mfile = "pre%s.manifest" % buildExt[1:]
