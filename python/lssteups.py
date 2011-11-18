@@ -8,7 +8,7 @@ import eups.distrib.server as eupsServer
 import eups.distrib        as eupsDistrib
 import eups.lock
 
-defaultPackageBase = "http://dev.lsstcorp.org/pkgs"
+defaultPackageBase = "http://dev.lsstcorp.org/pkgs/prod"
 
 class DistribServer(eupsServer.ConfigurableDistribServer):
     """a class that encapsulates the communication with a package server.
@@ -303,37 +303,42 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                                            self._getDistLocation(product, 
                                                                  version)))
 
+    _buildExtRe = re.compile(r'[\+\-](.*)$')
 
-    def _getDistLocation(self, product, version):
-        tarfile = "%s-%s.tar.gz" % (product, version)
+    def _getBuildExt(self, version):
+        mat = self._buildExtRe.search(version)
+        if mat:
+            return mat.group(0)
+        return None
 
-        if not self.noeups:
+    def _getDistLocation(self, product, version,
+                         flavor='generic', prodinfo=None):
+        verdir = self._buildExtRe.sub('', version)
+        tarfile = "%s-%s.tar.gz" % (product, verdir)
+        distdir = os.path.join(product, verdir)
+
+        if not prodinfo and not self.noeups:
             try :
                 pinfo = self.Eups.getProduct(product, version)
-                path = pinfo.dir
-                db = pinfo.stackRoot()
-
-                if path.startswith(db) and db != path:
-                    installdir = path[len(db)+1:]
-                else:
-                    p = path.find(os.path.join(product,version))
-                    if p > 0:
-                        db = path[:p]
-
-                        if db.endswith("external/"):
-                            p -= len("external/")
-                        installdir = path[p:]
-
-                buildfile = product+".bld"
-                if not os.path.exists(os.path.join(pinfo.dir,"ups",buildfile)):
-                    buildfile = tarfile
-
-                return os.path.join(installdir, buildfile)
-
             except eups.ProductNotFound:
-                pass
+                print >> self.log, "Note: Product not found, so assuming", \
+                                   "it's non-external"
 
-        return os.path.join(product, version, tarfile)
+        if prodinfo:
+            path = prodinfo.dir
+            p = path.find(os.path.join(product,version))
+            if p > 0:
+                db = path[:p]
+                if db.endswith("/external/"):
+                    distdir = os.path.join("external", distdir)
+                
+            db = prodinfo.stackRoot()
+
+            buildfile = product+".bld"
+            if os.path.exists(os.path.join(prodinfo.dir,"ups",buildfile)):
+                tarfile = buildfile
+
+        return os.path.join(distdir, tarfile)
         
     def createPackage(self, serverDir, product, version, flavor=None, 
                       overwrite=False, letterVersion=None):
@@ -356,8 +361,15 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         @param letterVersion The name for the desired "letter version"; a rebuild
                                  with following an ABI change in a dependency
         """
-        distId = self._getDistLocation(product, version)
-        installdir = os.path.dirname(distId)
+        installdir = None
+        instProd = None
+        try:
+            instProd = self.Eups.getProduct(product, version)
+            installdir = instProd.dir
+        except:
+            pass
+
+        distId = self._getDistLocation(product, version, prodinfo=instProd)
         distIdFile = os.path.join(serverDir, distId)
         distDir = os.path.dirname(distIdFile)
 
@@ -374,17 +386,153 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
             shutil.copyfile(tfile, os.path.join(distDir,os.path.basename(tfile)))
 
         # copy over the src tar file, if available
-        tfile = os.path.join(installdir, "ups", 
-                             "%s-%s.tar.gz" % (product, version) )
+        tardir = self.options.get("srctardir")
+        if not tardir:
+            tardir = os.path.join(installdir, "ups")
+        basever = self._buildExtRe.sub('', version)
+        tfile = os.path.join(tardir, "%s-%s.tar.gz" % (product, basever) )
         if os.path.exists(tfile):
-            shutil.copyfile(tfile, os.join(distDir, os.path.basename(tfile)))
+            shutil.copyfile(tfile, os.path.join(distDir, os.path.basename(tfile)))
         else:
             if self.verbose > 0:
-                print >> self.log, "Note: Don't know how to package source", \
-                    "code for", product, version
+                print >> self.log, "Note: Can't find package source", \
+                    "code for", product, version, "(%s)" % tfile
 
         # copy a build file over if it exists
         tfile = os.path.join(installdir, "ups", os.path.basename(distIdFile))
         if distIdFile.endswith(".bld") and os.path.exists(tfile):
             shutil.copy(tfile, distIdFile)
+
+        return self.getDistIdForPackage(product, version, flavor)
+
+    def updateDependencies(self, productList, flavor=None):
+        """fill in information in the list of product dependencies based
+        on what is known from the system and assumptions about server
+        conventions.
+
+        This implementation will modify the product dependencies' attributes
+        to match the conventions of the LSST distribution server.  This
+        implementation calls getDistIdForPackage(), and from that value it
+        will set distId, the table file, and the install directory.
+
+        @param productList     list of products (output from createDependencies)
+        @param flavor          the flavor of the target platform; this may 
+                                 be ignored by the implentation
+        """
+        for dep in productList:
+            flav = flavor
+            if not flav:
+                flav = dep.flavor
+            distId = self.getDistIdForPackage(dep.product, dep.version, flavor)
+            
+            pair = distId.split(':', 1)
+            if len(pair) < 2: pair.insert(0, 'tarball')
+            distType, path = pair
+            pdir = os.path.dirname(path)
+
+            vers = self._buildExtRe.sub('', dep.version)
+            release = dep.version
+
+            dep.distId = distId
+            dep.tablefile = os.path.join(pdir, "%s.table" % dep.product)
+            dep.instDir = os.path.join(os.path.dirname(pdir), release)
+
+        
+    def getManifestPath(self, serverDir, product, version,
+                        flavor=None, depData=None):
+        """return the path where the manifest for a particular product will
+        be deployed on the server.  In this implementation, manifests will
+        be stored provisionally into the product directory.  (A separate
+        release step will "release" them into the manifests directory.)
+
+        @param serverDir      the local directory representing the root of 
+                                 the package distribution tree.  In this 
+                                 implementation, the returned path will 
+                                 start with this directory.
+        @param product        the name of the product that the manifest is 
+                                for
+        @param version        the name of the product version
+        @param flavor         the flavor of the target platform for the 
+                                manifest.  In this implementation, a value
+                                of None will default to "generic".  
+        @param dep            an optional Dependency object corresponding 
+                                to the product itself.  If provided, the 
+                                implementation may use other attributes to 
+                                determine the place to put the manifest.  
+                                Default is None.  This implementation uses
+                                this information when available to place the
+                                manifest in the product directory.
+        """
+        if not depData or not depData.distId:
+            print >> self.log, "Warning: without access to a distId, " \
+                  "we must write manifest to a non-LSST-specific area."
+            return eupsDistrib.DefaultDistrib.getManifestPath(self, serverDir,
+                                                              product, version,
+                                                              flavor)
+
+        manpre = self.options.get("manifestPrefix", "b");
+
+        buildExt = self._getBuildExt(version)
+        if not buildExt:
+            # has no trailing "+N"
+            mfile = "%s0.manifest" % manpre
+        elif buildExt[0] == '+':
+            # has trailing "+N"
+            mfile = "%s%s.manifest" % (manpre, buildExt[1:])
+        else:
+            # has trailing "-.*"; treat it as a pre-release
+            mfile = "pre%s.manifest" % buildExt[1:]
+
+        path = depData.distId.split(':', 1)[-1]
+        pdir = os.path.dirname(path)
+        return os.path.join(serverDir, pdir, mfile)
+
+
+    def writeManifest(self, serverDir, productDeps, product, version,
+                      flavor=None, force=False):
+        """write out a manifest file for a given product with the given
+        dependencies.  See getManifestPath() for an explanation of where
+        manifests are deployed.  
+
+        @param serverDir      a local directory representing the root of the 
+                                  package distribution tree
+        @param productDeps    the list of product dependencies.  Each item in
+                                  the list is a Dependency instance
+        @param product        the name of the product to create the package 
+                                distribution for
+        @param version        the name of the product version
+        @param flavor         the flavor of the target platform; this may 
+                                be ignored by the implentation
+        """
+        self.initServerTree(serverDir)
+
+        selectmine = lambda d: d.product == product and d.version == version
+        mydep = filter(selectmine, productDeps)
+        mydep = (len(mydep) > 0 and mydep[0]) or None
+        out = self.getManifestPath(serverDir, product, version, flavor, mydep)
+
+        # create the manifest
+        man = eupsServer.Manifest(product, version, self.Eups, 
+                                  verbosity=self.verbose-1, log=self.log)
+        for dep in productDeps:
+            man.addDepInst(dep)
+
+        # write out manifest
+        man.write(out, flavor=flavor, noOptional=False)
+        self.setGroupPerms(out)
+
+    def initServerTree(self, serverDir):
+        """initialize the given directory to serve as a package distribution
+        tree.
+        @param serverDir    the directory to initialize
+        """
+        eupsDistrib.Distrib.initServerTree(self, serverDir)
+
+        for dir in "manifests external".split():
+            dir = os.path.join(serverDir, dir)
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+
+                # set group owner ship and permissions, if desired
+                self.setGroupPerms(dir)
 
