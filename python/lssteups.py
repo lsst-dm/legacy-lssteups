@@ -405,7 +405,7 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
         return self.getDistIdForPackage(product, version, flavor)
 
-    def updateDependencies(self, productList, flavor=None):
+    def updateDependencies(self, productList, flavor=None, mapping=None):
         """fill in information in the list of product dependencies based
         on what is known from the system and assumptions about server
         conventions.
@@ -418,6 +418,7 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         @param productList     list of products (output from createDependencies)
         @param flavor          the flavor of the target platform; this may 
                                  be ignored by the implentation
+        @param mapping         (ignored by this implementation)
         """
         for dep in productList:
             flav = flavor
