@@ -420,6 +420,20 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                                  be ignored by the implentation
         @param mapping         (ignored by this implementation)
         """
+
+        # find the delete list
+        if self.opts.has_key("ignoredepfile") and \
+           os.path.exists(self.opts["ignoredepfile"]):
+            # this list of products will be removed from the list
+            ignore = self._loadIgnoreDepFile(self.opts["ignoredepfile"])
+            for prod in ignore:
+                found = map(lambda p: p[0],
+                            filter(lambda d: d[1].product == prod,
+                                   enumerate(productList)))
+                found.reverse()
+                for i in found:
+                    productList.pop(i)
+        
         for dep in productList:
             flav = flavor
             if not flav:
@@ -438,7 +452,13 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
             dep.tablefile = os.path.join(pdir, "%s.table" % dep.product)
             dep.instDir = os.path.join(os.path.dirname(pdir), release)
 
-        
+    def _loadIgnoreDepFile(self, filepath):
+        out = []
+        with open(filepath) as fd:
+            for line in fd:
+                out += line.strip().split()
+        return out
+                
     def getManifestPath(self, serverDir, product, version,
                         flavor=None, depData=None):
         """return the path where the manifest for a particular product will
