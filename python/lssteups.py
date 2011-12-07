@@ -454,9 +454,13 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
 
     def _loadIgnoreDepFile(self, filepath):
         out = []
-        with open(filepath) as fd:
+
+        fd = open(filepath)
+        try:
             for line in fd:
                 out += line.strip().split()
+        finally:
+            fd.close()
         return out
                 
     def getManifestPath(self, serverDir, product, version,
