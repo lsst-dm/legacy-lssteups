@@ -6,3 +6,5 @@
 
 # /python/
 /python/*.pyc
+*~
+/ups/*.cfgc

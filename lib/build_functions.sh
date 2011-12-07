@@ -47,7 +47,7 @@ function user_is_root {
 function interrupted {
     echo Build has been interrupted!
     echo 
-    echo Be sure to run \"lsstpkg clean $product $version\" to clean up the mess
+    echo Be sure to run \"eups distrib clean $product $version\" to clean up the mess
     echo 
     exit 2
 }
@@ -98,13 +98,29 @@ function fetch  {
 
 #@
 #  fetch and install the .cfg file for the package in the
-#  ups directory.  This assumes a .cfg files with the same
-#  name as the package is available on the distribution
-#  server.
+#  ups directory.  
+#  @param file       the name of the .cfg file to fetch and install.  If
+#                      not a path (with no parent directory given), a path
+#                      is assumed according to the dirpath parameter.
+#                      If not provided, the base filename will be assumed 
+#                      to be $product.cfg.
+#  @param dirpath    a path to prepend to the file given in the first 
+#                      parameter.  If not given, this path will be assumed
+#                      to be external/$product/$release unless the first
+#                      parameter is a path rather than a bare filename.
 #
 function fetch_cfg {
+    cfgfile=$1
+    [ -z "$cfgfile" ] && cfgfile=$product.cfg
+    dirpath=$2
+    if [ -n "$dirpath" ]; then
+        cfgfile=$dirpath/$cfgfile
+    elif { echo $cfgpath | grep -vqs /; }; then
+        cfgfile=external/$product/$release/$cfgfile
+    fi
+
     mkdir -p $installdir/ups
-    (cd $installdir/ups && fetch external/$product/$release/$product.cfg)
+    (cd $installdir/ups && fetch $cfgfile $product.cfg)
 }
 
 #@
