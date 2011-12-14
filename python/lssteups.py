@@ -157,6 +157,10 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         self.nobuild = self.options.get("nobuild", False)
         self.noclean = self.options.get("noclean", False)
 
+        # this will be used to determine if the manifestToFile option was 
+        # not used in conjunction with -j 
+        self._outmanfile = [ self.options.get("manifestToFile", None), None ]
+
     # @staticmethod   # requires python 2.4
     def parseDistID(distID):
         """Return a valid package location if and only we recognize the 
@@ -341,12 +345,17 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         return os.path.join(distdir, tarfile)
         
     def createPackage(self, serverDir, product, version, flavor=None, 
-                      overwrite=False, letterVersion=None):
+                      overwrite=False):
         """Write a package distribution into server directory tree and 
         return the distribution ID.  If a package is made up of several files,
         all of them (except for the manifest) should be deployed by this 
         function.  This includes the table file if it is not incorporated
         another file.  
+
+        Note that the package artifacts will not be created if the 
+        manifestToFile option is set.  This option instructs lssteups to 
+        produce only the manifest file.  
+
         @param serverDir      a local directory representing the root of the 
                                   package distribution tree
         @param product        the name of the product to create the package 
@@ -358,9 +367,17 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
                                 if supported.
         @param overwrite      if True, this package will overwrite any 
                                 previously existing distribution files even if Eups.force is false
-        @param letterVersion The name for the desired "letter version"; a rebuild
-                                 with following an ABI change in a dependency
         """
+        if self._outmanfile[0] is not None:
+            if self._outmanfile[1] is False and \
+               os.path.exists(self._outmanfile[0]):
+                print >> self.log, "Warning: it appears that the", \
+                    "manifestToFile option was used without -j."
+                print >> self.log, "         I will not overwrite %s." % \
+                    self._outmanfile[0]
+                self._outmanfile[1] = True
+            return
+
         installdir = None
         instProd = None
         try:
@@ -372,9 +389,6 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         distId = self._getDistLocation(product, version, prodinfo=instProd)
         distIdFile = os.path.join(serverDir, distId)
         distDir = os.path.dirname(distIdFile)
-
-#        if letterVersion:
-#            raise RuntimeError("Letter versions are not supported: %s" % letterVersion)
 
         # make the product directory
         if not os.path.exists(distDir):
@@ -422,10 +436,10 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         """
 
         # find the delete list
-        if self.opts.has_key("ignoredepfile") and \
-           os.path.exists(self.opts["ignoredepfile"]):
+        if self.options.has_key("ignoredepfile") and \
+           os.path.exists(self.options["ignoredepfile"]):
             # this list of products will be removed from the list
-            ignore = self._loadIgnoreDepFile(self.opts["ignoredepfile"])
+            ignore = self._loadIgnoreDepFile(self.options["ignoredepfile"])
             for prod in ignore:
                 found = map(lambda p: p[0],
                             filter(lambda d: d[1].product == prod,
@@ -516,8 +530,12 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
     def writeManifest(self, serverDir, productDeps, product, version,
                       flavor=None, force=False):
         """write out a manifest file for a given product with the given
-        dependencies.  See getManifestPath() for an explanation of where
-        manifests are deployed.  
+        dependencies.  By default, getManifestPath() determines where 
+        the manifest will be written (see that function's documentation 
+        for more info).  If the manifestToFile is option is set, it's value
+        is taken as the output filename to write to.  Use of this option
+        implies the use of -j (do not create dependency products); care will 
+        be taken to only write out the top product's manifest.  
 
         @param serverDir      a local directory representing the root of the 
                                   package distribution tree
@@ -531,10 +549,26 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         """
         self.initServerTree(serverDir)
 
+        if self._outmanfile[1] is not None and \
+           os.path.exists(self._outmanfile[0]):
+            if not self._outmanfile[1]:
+                print >> self.log, "Warning: it appears that the", \
+                    "manifestToFile option was used without -j."
+                print >> self.log, "         I will not overwrite", \
+                    self._outmanfile[0]
+                self._outmanfile[1] = True
+            return
+
         selectmine = lambda d: d.product == product and d.version == version
         mydep = filter(selectmine, productDeps)
         mydep = (len(mydep) > 0 and mydep[0]) or None
-        out = self.getManifestPath(serverDir, product, version, flavor, mydep)
+
+        if self._outmanfile[0]:
+            out = self._outmanfile[0]
+            self._outmanfile[1] = False   # changed None => False
+        else:
+            out = self.getManifestPath(serverDir, product, version, 
+                                       flavor, mydep)
 
         # create the manifest
         man = eupsServer.Manifest(product, version, self.Eups, 
