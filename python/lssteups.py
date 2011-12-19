@@ -579,6 +579,8 @@ class BuildDistrib(eupsDistrib.DefaultDistrib):
         # write out manifest
         man.write(out, flavor=flavor, noOptional=False)
         self.setGroupPerms(out)
+        if self.verbose and self._outmanfile[0]:
+            print >> self.log, "Wrote manifest to %s." % self._outmanfile[0]
 
     def initServerTree(self, serverDir):
         """initialize the given directory to serve as a package distribution
