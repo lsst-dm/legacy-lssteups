@@ -12,6 +12,8 @@ if [ $? -ne 0 -o -z "$httpget" ]; then
     return fail_to_find_cmd make
 elif [ `basename $httpget` = 'wget' ]; then
     httpget="$httpget -O -"
+elif [ `basename $httpget` = 'curl' ]; then
+    httpget="$httpget -L"
 fi
 
 rmcmd=/bin/rm
